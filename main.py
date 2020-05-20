@@ -62,7 +62,7 @@ def start(message):
     bot.send_message(message.chat.id, 'Вітаємо!\n'
                                       'Я бот для замовлень продукції YUMI Lashes \n' 
                                       'Виберіть товари та добавте їх в кошик. \n'
-                                      'Після замовлення менеджер звяжеться з вами для відправки товару.\n'
+                                      'Після замовлення менеджер зв\'яжеться з вами для відправки товару.\n'
                                       'Оберіть потрібну дію', reply_markup=markup)
 
 
@@ -185,7 +185,7 @@ def bucket_upd(call):
         but5 = types.InlineKeyboardButton('⬅', callback_data='prev')
         but6 = types.InlineKeyboardButton('{}/{}'.format(int(get_user(call, 'index_buck'))+1, len(Counter(get_user(call, 'tovar_id')).keys())), callback_data='None')
         but7 = types.InlineKeyboardButton('➡', callback_data='next')
-        but8 = types.InlineKeyboardButton('✅ Ваш заказ на {}грн. Офромить?'.format(sum([int(list(collection.find({'_id' : key}))[0]['price'][:-3])*value
+        but8 = types.InlineKeyboardButton('✅ Замовлення на {}грн. Оформити?'.format(sum([int(list(collection.find({'_id' : key}))[0]['price'][:-3])*value
                                                                                         for key, value
                                                                                         in Counter(get_user(call, 'tovar_id')).items()])),
                                           callback_data='confirm')
@@ -249,7 +249,7 @@ def confirm(call):
 
 @bot.callback_query_handler(func=lambda call: call.data in ['Самовивіз', 'Нова Пошта'])
 def record_delivery(call):
-    collection_user.update_one({'_id': call.message.chat.id},
+    collection_user.update_one({'_id' : call.message.chat.id},
                                {'$set' : {'delivery' : call.data.replace('Нова Пошта', '2').replace('Самовивіз', '1')}})
     if get_user(call, 'name') == None:
         get_name(call.message)
@@ -258,7 +258,7 @@ def record_delivery(call):
 
 
 def get_name(message):
-    bot.send_message(message.chat.id, 'Введіть ваше ім\'я:')
+    bot.send_message(message.chat.id, 'Введіть ваш ПІБ:')
     bot.register_next_step_handler(message, record_name)
 
 def record_name(message):
@@ -271,7 +271,7 @@ def record_name(message):
 
 def get_number(message):
 
-    markup = types.ReplyKeyboardMarkup()
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
 
     but1 = types.KeyboardButton('Відправити контакт', request_contact=True)
 
@@ -292,8 +292,12 @@ def record_number(message):
             get_number(message)
 
     else:
-        collection_user.update_one({'_id': message.chat.id},
+        if message.contact.phone_number.startswith('+'):
+            collection_user.update_one({'_id': message.chat.id},
                                    {'$set': {'number': message.contact.phone_number[1:]}})
+        else:
+            collection_user.update_one({'_id': message.chat.id},
+                                       {'$set': {'number': message.contact.phone_number}})
         summary(message)
 
 def summary(message):
@@ -313,7 +317,7 @@ def summary(message):
                                "Телефон: _{2}_\n"
                                "Спосіб доставки: _{3}_".format(
                               sum([int(list(collection.find({'_id' : key}))[0]['price'][:-3])*value for key, value in Counter(get_user(message, 'tovar_id')).items()]),
-                              get_user(message, 'name'), get_user(message, 'number'), 'Нова Пошта' if get_user(message, 'delivery') == 2 else 'Самовивіз'
+                              get_user(message, 'name'), get_user(message, 'number'), ('Нова Пошта' if get_user(message, 'delivery') == '2' else 'Самовивіз')
 
 
                           ), parse_mode='MarkdownV2')
@@ -368,7 +372,7 @@ def get_ord_number(call):
 
         markup.add(but1)
 
-        bot.send_message(call.message.chat.id, ' Введіть ваш номер телефону в форматі (380) або відправте контакт',
+        bot.send_message(call.message.chat.id, 'Введіть ваш номер телефону в форматі (380) або відправте контакт',
                          reply_markup=markup)
         bot.register_next_step_handler(call.message, ord_record_number)
     else:
@@ -400,11 +404,14 @@ def orders(message):
     for i in range(len(data['orders'])):
         text = ''
         text += 'Замовлення № ' + data['orders'][i]['orderid'] + '\n'
-        text += 'Ваші товари:' + '\n'
+        text += 'Ваші товари:' + '\n' + '\n'
+
         for x in range(len(data['orders'][i]['products'])):
-            text += data['orders'][i]['products'][x]['name'] + ' - ' + data['orders'][i]['products'][x]['count'][:-4] + '\n'
-        text += 'Сума: '  + data['orders'][i]['sum'][:-3] + '\n'
+            text += data['orders'][i]['products'][x]['name'] + ' - ' + data['orders'][i]['products'][x]['count'][:-4] + 'шт'+ '\n'
+
+        text += '\n' + 'Сума: '  + data['orders'][i]['sum'][:-3] + '\n'
         text += 'Статус замовлення:' + data['orders'][i]['statusname']
+
         bot.send_message(message.chat.id, text)
 
     markup = types.InlineKeyboardMarkup(row_width=1)
