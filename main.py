@@ -49,6 +49,7 @@ def start(message):
                                    {'$set' : {'index' : 0,
                                               'category' : 0,
                                               'index_buck': 0,
+                                              'tovar_id' : []
                                               }})
 
     markup = types.InlineKeyboardMarkup(row_width=1)
@@ -83,6 +84,7 @@ def tovars(call):
     markup = types.InlineKeyboardMarkup()
     if  call.data in ['13', '14']:
         collection_user.update_one({'_id':call.message.chat.id}, {'$set': {'category': call.data}})
+        collection_user.update_one({'_id': call.message.chat.id}, {'$set': {'index': 0}})
 
         markup.row(types.InlineKeyboardButton('Замовити: ({} грн)'.format(get_tovar(call, 'price')[:-3]),
                                           callback_data='add{}'.format(get_tovar(call, '_id'))))
@@ -113,7 +115,7 @@ def tovars(call):
 
 
         else:
-            markup.row(types.InlineKeyboardButton('{} грн'.format(get_tovar(call, 'price')[:-3]),
+            markup.row(types.InlineKeyboardButton('Замовити: ({} грн)'.format(get_tovar(call, 'price')[:-3]),
                                                   callback_data='add{}'.format(get_tovar(call, '_id'))))
 
 
@@ -249,12 +251,49 @@ def confirm(call):
 
 @bot.callback_query_handler(func=lambda call: call.data in ['Самовивіз', 'Нова Пошта'])
 def record_delivery(call):
-    collection_user.update_one({'_id' : call.message.chat.id},
-                               {'$set' : {'delivery' : call.data.replace('Нова Пошта', '2').replace('Самовивіз', '1')}})
-    if get_user(call, 'name') == None:
-        get_name(call.message)
+    if call.data == 'Самовивіз':
+        collection_user.update_one({'_id' : call.message.chat.id},
+                               {'$set' : {'delivery' : call.data.replace('Самовивіз', '1')}})
+
+        if get_user(call, 'name') == None:
+            get_name(call.message)
+        else:
+            summary(call.message)
+
+    elif call.data == 'Нова Пошта':
+        collection_user.update_one({'_id': call.message.chat.id},
+                                   {'$set': {'delivery': call.data.replace('Нова Пошта', '2')}})
+
+        get_pochta_name(call.message)
+
+def get_pochta_name(message):
+
+    bot.send_message(message.chat.id, 'Введіть ваше місто')
+
+    bot.register_next_step_handler(message, record_pochta_name)
+
+def record_pochta_name(message):
+    collection_user.update_one({'_id': message.chat.id},
+                               {'$set': {'pochta_city' : message.text}})
+
+    get_pochta_num(message)
+
+
+def get_pochta_num(message):
+
+    bot.send_message(message.chat.id, 'Введіть номер відділення')
+
+    bot.register_next_step_handler(message, record_pochta_num)
+
+def record_pochta_num(message):
+
+    collection_user.update_one({'_id': message.chat.id},
+                               {'$set': {'pochta_num' : message.text}})
+
+    if get_user(message, 'name') == None:
+        get_name(message)
     else:
-        summary(call.message)
+        summary(message)
 
 
 def get_name(message):
@@ -264,10 +303,12 @@ def get_name(message):
 def record_name(message):
     collection_user.update_one({'_id': message.chat.id},
                                {'$set': {'name': message.text.replace(' ', '%20')}})
+
     if get_user(message, 'number') != 0:
         summary(message)
     else:
         get_number(message)
+
 
 def get_number(message):
 
@@ -317,7 +358,7 @@ def summary(message):
                                "Телефон: _{2}_\n"
                                "Спосіб доставки: _{3}_".format(
                               sum([int(list(collection.find({'_id' : key}))[0]['price'][:-3])*value for key, value in Counter(get_user(message, 'tovar_id')).items()]),
-                              get_user(message, 'name'), get_user(message, 'number'), ('Нова Пошта' if get_user(message, 'delivery') == '2' else 'Самовивіз')
+                              get_user(message, 'name').replace('%20', ' '), get_user(message, 'number'), ('Нова Пошта' if get_user(message, 'delivery') == '2' else 'Самовивіз')
 
 
                           ), parse_mode='MarkdownV2')
@@ -335,25 +376,36 @@ def send_request(call):
     clientnamefirst = get_user(call, 'name')
     clientphone =  get_user(call, 'number')
     delivery = get_user(call, 'delivery')
+    pochta = ''
+    if delivery == '2':
+        pochta_num = get_user(call, 'pochta_num')
+        pochta_city = get_user(call, 'pochta_city')
+        pochta = f'&customuser_NomerotdeleniyaNP={pochta_num},%20{pochta_city}'
 
     url = '{0}{1}?login={2}' \
                       '&password={3}' \
                       '&workflowid=11' \
                       '&clientnamefirst={4}' \
                       '&clientphone={5}' \
-                      '&order_deliveryid={6}'.format(domen, method, login, password_box,
+                      '&order_deliveryid={6}' \
+                      '&groupid=5'\
+                      '&typesex=woman'\
+                      '{7}'.format(domen, method, login, password_box,
                                                 clientnamefirst,
-                                                clientphone, delivery)
+                                                clientphone, delivery, pochta)
+
+
 
     for i, item in enumerate(Counter(get_user(call, 'tovar_id')).most_common()):
         url += '&productArray[{0}][id]={2}&productArray[{1}][count]={3}'.format(
             i, i, item[0], item[1]
         )
+
     r_update = requests.get(url=url)
 
     data = r_update.json()
     if data['result'] == 'ok':
-        bot.send_message(call.message.chat.id, 'Заказ успешно создан')
+        bot.send_message(call.message.chat.id, 'Замовлення успішно створене!')
         collection_user.update_one({'_id': call.message.chat.id},
                                    {'$set': {'index': 0,
                                              'category': 0,
