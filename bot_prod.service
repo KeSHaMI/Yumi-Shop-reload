@@ -1,0 +1,15 @@
+[Unit]
+Description=YUMI telegram BOT SHOP
+After=syslog.target
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/usr/local/bin/yumi_shop
+ExecStart=/usr/bin/python3 /usr/local/bin/yumi_shop/main.py
+RestartSec=10
+Restart=always
+ 
+[Install]
+WantedBy=multi-user.target

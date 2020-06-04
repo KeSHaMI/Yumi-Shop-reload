@@ -79,7 +79,7 @@ def categories(call):
 
     bot.send_message(call.message.chat.id, 'Оберіть категорію товару', reply_markup=markup)
 
-@bot.callback_query_handler(func=lambda call: call.data in ['13', '14'])
+@bot.callback_query_handler(func=lambda call: call.data in ['13', '14', 'cancel'])
 def tovars(call):
     markup = types.InlineKeyboardMarkup()
     if  call.data in ['13', '14']:
@@ -353,7 +353,7 @@ def summary(message):
 
     bot.send_message(chat_id=message.chat.id, reply_markup=markup,
                           text="Дані замовлення:\n"
-                               "Сумма замовлення: _{0}грн_\n"
+                               "Сума: _{0}грн_\n"
                                "Ім'я: _{1}_\n"
                                "Телефон: _{2}_\n"
                                "Спосіб доставки: _{3}_".format(
