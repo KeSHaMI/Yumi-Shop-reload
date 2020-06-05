@@ -3,7 +3,7 @@ from telebot import types
 import json
 import requests
 import re
-from config import Token, password, domen, login, password_box, method
+from config import *
 import pymongo
 from collections import Counter
 
@@ -54,17 +54,29 @@ def start(message):
 
     markup = types.InlineKeyboardMarkup(row_width=1)
 
-    but1 = types.InlineKeyboardButton('Товари', callback_data='tovars')
-    but2 = types.InlineKeyboardButton('Кошик', callback_data='bucket')
-    but3 = types.InlineKeyboardButton('Історія замовлень', callback_data='orders')
+    but1 = types.InlineKeyboardButton('🛍 Товари', callback_data='tovars')
+    but2 = types.InlineKeyboardButton('🛒 Кошик', callback_data='bucket')
+    but3 = types.InlineKeyboardButton('📒 Історія замовлень', callback_data='orders')
 
     markup.add(but1, but2, but3)
 
-    bot.send_message(message.chat.id, 'Вітаємо!\n'
+    bot.send_message(message.chat.id, 'Вітаю!\n'
                                       'Я бот для замовлень продукції YUMI Lashes \n' 
-                                      'Виберіть товари та добавте їх в кошик. \n'
-                                      'Після замовлення менеджер зв\'яжеться з вами для відправки товару.\n'
-                                      'Оберіть потрібну дію', reply_markup=markup)
+                                      'Оберіть товари та добавте їх у кошик. \n'
+                                      'Після замовлення менеджер зв\'яжеться з Вами для узгодження деталей.\n'
+                                      'Що ви хочете переглянути?:', reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data == 'back')
+def startscreen(call):
+    markup = types.InlineKeyboardMarkup(row_width=1)
+
+    but1 = types.InlineKeyboardButton('🛍 Товари', callback_data='tovars')
+    but2 = types.InlineKeyboardButton('🛒 Кошик', callback_data='bucket')
+    but3 = types.InlineKeyboardButton('📒 Історія замовлень', callback_data='orders')
+
+    markup.add(but1, but2, but3)
+
+    bot.send_message(call.message.chat.id, 'Оберіть дію:', reply_markup=markup)
 
 
 @bot.callback_query_handler(func=lambda call: call.data == 'tovars')
@@ -74,8 +86,10 @@ def categories(call):
 
     but1 = types.InlineKeyboardButton('Основні продукти', callback_data='14')
     but2 = types.InlineKeyboardButton('Аксесуари', callback_data='13')
+    but3 = types.InlineKeyboardButton('🔙  Повернутися назад', callback_data='back')
 
-    markup.add(but1, but2)
+    markup.add(but1, but2, but3)
+
 
     bot.send_message(call.message.chat.id, 'Оберіть категорію товару', reply_markup=markup)
 
@@ -86,7 +100,7 @@ def tovars(call):
         collection_user.update_one({'_id':call.message.chat.id}, {'$set': {'category': call.data}})
         collection_user.update_one({'_id': call.message.chat.id}, {'$set': {'index': 0}})
 
-        markup.row(types.InlineKeyboardButton('Замовити: ({} грн)'.format(get_tovar(call, 'price')[:-3]),
+        markup.row(types.InlineKeyboardButton('✔Замовити на {} грн.'.format(get_tovar(call, 'price')[:-3]),
                                           callback_data='add{}'.format(get_tovar(call, '_id'))))
 
 
@@ -98,9 +112,9 @@ def tovars(call):
 
         markup.row(but1, but2, but3)
 
-        markup.row(types.InlineKeyboardButton('Кошик', callback_data='bucket'))
+        markup.row(types.InlineKeyboardButton('🛒  Кошик', callback_data='bucket'))
 
-        markup.row(types.InlineKeyboardButton('Повернутися назад', callback_data='tovars'))
+        markup.row(types.InlineKeyboardButton('🔙  Повернутися назад', callback_data='tovars'))
 
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                               text='<a href="{1}">{0}</a>'.format(get_tovar(call, 'name'), get_tovar(call, 'image')),
@@ -109,13 +123,13 @@ def tovars(call):
 
     else:
         if Counter(get_user(call, 'tovar_id')).get(get_tovar(call, '_id')):
-            markup.row(types.InlineKeyboardButton('Замовити: ({} грн) - {}шт'.format(get_tovar(call, 'price')[:-3],
+            markup.row(types.InlineKeyboardButton('✔Замовити на {} грн. - {} шт.'.format(get_tovar(call, 'price')[:-3],
                                                     Counter(get_user(call, 'tovar_id')).get(get_tovar(call, '_id'))),
                                                   callback_data='add{}'.format(get_tovar(call, '_id'))))
 
 
         else:
-            markup.row(types.InlineKeyboardButton('Замовити: ({} грн)'.format(get_tovar(call, 'price')[:-3]),
+            markup.row(types.InlineKeyboardButton('✔Замовити на {} грн.'.format(get_tovar(call, 'price')[:-3]),
                                                   callback_data='add{}'.format(get_tovar(call, '_id'))))
 
 
@@ -127,8 +141,8 @@ def tovars(call):
         but3 = types.InlineKeyboardButton('➡', callback_data='plus')
 
         markup.row(but1, but2, but3)
-        markup.row(types.InlineKeyboardButton('Кошик', callback_data='bucket'))
-        markup.row(types.InlineKeyboardButton('Повернутися назад', callback_data='tovars'))
+        markup.row(types.InlineKeyboardButton('🛒  Кошик', callback_data='bucket'))
+        markup.row(types.InlineKeyboardButton('🔙  Повернутися назад', callback_data='tovars'))
 
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup,
                               text='<a href="{1}">{0}</a>'.format(get_tovar(call, 'name'), get_tovar(call, 'image')), parse_mode='HTML'
@@ -187,14 +201,17 @@ def bucket_upd(call):
         but5 = types.InlineKeyboardButton('⬅', callback_data='prev')
         but6 = types.InlineKeyboardButton('{}/{}'.format(int(get_user(call, 'index_buck'))+1, len(Counter(get_user(call, 'tovar_id')).keys())), callback_data='None')
         but7 = types.InlineKeyboardButton('➡', callback_data='next')
-        but8 = types.InlineKeyboardButton('✅ Замовлення на {}грн. Оформити?'.format(sum([int(list(collection.find({'_id' : key}))[0]['price'][:-3])*value
+        but8 = types.InlineKeyboardButton('✅ Замовлення на {} грн. Оформити?'.format(sum([int(list(collection.find({'_id' : key}))[0]['price'][:-3])*value
                                                                                         for key, value
                                                                                         in Counter(get_user(call, 'tovar_id')).items()])),
                                           callback_data='confirm')
 
+        but9 = types.InlineKeyboardButton('🔙  Продовжити покупки', callback_data='tovars')
+
         markup.row(but1, but2, but3, but4)
         markup.row(but5, but6, but7)
         markup.row(but8)
+        markup.row(but9)
 
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                               text='Ваш кошик:\n'
@@ -241,8 +258,8 @@ def confirm(call):
 
     but1 = types.InlineKeyboardButton('Самовивіз', callback_data='Самовивіз')
     but2 = types.InlineKeyboardButton('Нова Пошта', callback_data='Нова Пошта')
-    but3 = types.InlineKeyboardButton('Відмінити замовлення', callback_data='cancel')
-    but4 = types.InlineKeyboardButton('Повернутись', callback_data='bucket')
+    but3 = types.InlineKeyboardButton('❌ Скасувати', callback_data='cancel')
+    but4 = types.InlineKeyboardButton('🔙 Повернутись', callback_data='bucket')
 
     markup.add(but1, but2, but3, but4)
 
@@ -253,7 +270,7 @@ def confirm(call):
 def record_delivery(call):
     if call.data == 'Самовивіз':
         collection_user.update_one({'_id' : call.message.chat.id},
-                               {'$set' : {'delivery' : call.data.replace('Самовивіз', '1')}})
+                               {'$set' : {'delivery' : '1'}})
 
         if get_user(call, 'name') == None:
             get_name(call.message)
@@ -262,7 +279,7 @@ def record_delivery(call):
 
     elif call.data == 'Нова Пошта':
         collection_user.update_one({'_id': call.message.chat.id},
-                                   {'$set': {'delivery': call.data.replace('Нова Пошта', '2')}})
+                                   {'$set': {'delivery': '2'}})
 
         get_pochta_name(call.message)
 
@@ -297,7 +314,11 @@ def record_pochta_num(message):
 
 
 def get_name(message):
+
+    bot.delete_message(message_id=message.message_id, chat_id=message.chat.id)
+
     bot.send_message(message.chat.id, 'Введіть ваш ПІБ:')
+
     bot.register_next_step_handler(message, record_name)
 
 def record_name(message):
@@ -318,8 +339,12 @@ def get_number(message):
 
     markup.add(but1)
 
-    bot.send_message(message.chat.id, ' Введіть ваш номер телефону в форматі (380) або відправте контакт',
+    bot.delete_message(message_id=message.message_id, chat_id=message.chat.id)
+
+    bot.send_message(message.chat.id,
+                     'Введіть ваш номер телефону в форматі 380XXYYYYYYY або надішліть контакт',
                      reply_markup=markup)
+
     bot.register_next_step_handler(message, record_number)
 
 def record_number(message):
@@ -387,7 +412,7 @@ def send_request(call):
                       '&workflowid=11' \
                       '&clientnamefirst={4}' \
                       '&clientphone={5}' \
-                      '&order_deliveryid={6}' \
+                      '&deliveryid={6}' \
                       '&groupid=5'\
                       '&typesex=woman'\
                       '{7}'.format(domen, method, login, password_box,
@@ -427,6 +452,7 @@ def get_ord_number(call):
         bot.send_message(call.message.chat.id, 'Введіть ваш номер телефону в форматі (380) або відправте контакт',
                          reply_markup=markup)
         bot.register_next_step_handler(call.message, ord_record_number)
+
     else:
         orders(call.message)
 
@@ -452,30 +478,59 @@ def orders(message):
         f'?login=yuriy&password=5cd1e067f9a747c45e6d5a0896aac817&clientphone={number}&workflowid=11'
 
     data = requests.get(url).json()
+    print(data)
 
     for i in range(len(data['orders'])):
         text = ''
-        text += 'Замовлення № ' + data['orders'][i]['orderid'] + '\n'
-        text += 'Ваші товари:' + '\n' + '\n'
+        text += 'Замовлення №' + data['orders'][i]['orderid'] + '\n'
+        text += 'Дата замовлення: ' + data['orders'][i]['cdate'] + '\n'
+        text += 'Спосіб доставки: ' + data['orders'][i]['deliveriID'].replace('1', 'Самовивіз').replace('2', 'Нова почта').replace('0', 'Відсутні') + '\n'
+        text += 'Ваші товари:' + '\n'
+
 
         for x in range(len(data['orders'][i]['products'])):
-            text += data['orders'][i]['products'][x]['name'] + ' - ' + data['orders'][i]['products'][x]['count'][:-4] + 'шт'+ '\n'
+            text += data['orders'][i]['products'][x]['name'] + ' \\- ' + data['orders'][i]['products'][x]['count'][:-4] + ' шт.'+ '\n'
 
-        text += '\n' + 'Сума: '  + data['orders'][i]['sum'][:-3] + '\n'
-        text += 'Статус замовлення:' + data['orders'][i]['statusname']
+        text += '\n' + 'Сума: '  + data['orders'][i]['sum'] + '\n'
+        text += 'Статус: ' + translate_order_status(data['orders'][i]['statusid'])
 
         bot.send_message(message.chat.id, text)
 
     markup = types.InlineKeyboardMarkup(row_width=1)
 
-    but1 = types.InlineKeyboardButton('Товари', callback_data='tovars')
-    but2 = types.InlineKeyboardButton('Кошик', callback_data='bucket')
-    but3 = types.InlineKeyboardButton('Замовлення', callback_data='orders')
+    but1 = types.InlineKeyboardButton('🛍 Товари', callback_data='tovars')
+    but2 = types.InlineKeyboardButton('🛒 Кошик', callback_data='bucket')
+    but3 = types.InlineKeyboardButton('📒 Історія замовленнь', callback_data='orders')
 
     markup.add(but1, but2, but3)
 
-    bot.send_message(message.chat.id, 'Оберіть потрібну дію', reply_markup=markup, )
+    bot.send_message(message.chat.id, 'Оберіть потрібну дію:', reply_markup=markup)
 
+def translate_order_status(statusid):
+
+    if statusid == '68':
+        return 'Нове замовлення'
+
+    if statusid == '77':
+        return 'В роботі'
+
+    if statusid == '74':
+        return 'Відмінити'
+
+    if statusid == '114':
+        return 'Відмінено'
+
+    if statusid == '72':
+        return 'Доставлений'
+
+    if statusid == '73':
+        return 'Виконано'
+
+    if statusid == '136':
+        return 'Повернення'
+
+    if statusid == '137':
+        return 'Успішне повернення'
 
 
 bot.polling(none_stop=True)
